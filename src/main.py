@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Request, Response
-from logger import logger
 import psycopg2
 from psycopg2.extras import Json, DictCursor
 import uvicorn

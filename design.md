@@ -32,3 +32,7 @@ graph TD;
     - Device decrypts data received at location.
     - Device cross checks data size and lets server know.
     - Server ends job when destination shares data size.    (Potential for hacking)
+
+
+
+Incorrect destination or incorrect packet received should be notified to the server from the client.

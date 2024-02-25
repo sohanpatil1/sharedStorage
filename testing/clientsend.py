@@ -3,9 +3,6 @@ import socket
 def main():
 
     csocks = [] # client sockets
-
-
-
     # Connect the socket to the server address
     # server_address = ('2601:647:5580:9310:18e:7b3d:5991:66b9', 12345)  # Use IPv6 loopback address
     server_address = ('localhost', 8000)
