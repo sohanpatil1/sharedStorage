@@ -24,15 +24,14 @@ def main():
     client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     client_socket.connect(('0.0.0.0', 8090))
 
-    try:
-        # Send data
-        message = "Hello, world"
-        print(f"sender2 sending '{message}' to the server")
-        client_socket.send(message.encode())
-    except:
-        print("error")
     while True:
-        pass
+        try:
+            message = "Hello, world"
+            print(f"sender sending '{message}' to the server")
+            client_socket.send(message.encode())
+            time.sleep(1)
+        except KeyboardInterrupt:
+            exit(0)
 
 if __name__ == "__main__":
     main()

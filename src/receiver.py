@@ -2,6 +2,7 @@
 import socket
 import hashlib
 import os
+import time
 
 
 def getChecksum(data):
@@ -23,16 +24,16 @@ def main():
     client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     client_socket.connect(('0.0.0.0', 8090))
 
-    try:
-        # Receive response
-        data = client_socket.recv(64)
-        retChecksum = getChecksum(data.decode())
-        print(f"client1 received checksum {retChecksum}")
-        print(f"Received checksum'{data.decode()}' from recepient")
+    while True:
+        try:
+            data = client_socket.recv(64)
+            if data:
+                print(f"receiver.py : {data.decode()}")
+            time.sleep(1)
 
-    finally:
-        # Clean up
-        client_socket.close()
+        except KeyboardInterrupt:
+            # Clean up
+            client_socket.close()
 
 if __name__ == "__main__":
     main()
