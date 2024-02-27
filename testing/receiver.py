@@ -24,10 +24,6 @@ def main():
     client_socket.connect(('0.0.0.0', 8090))
 
     try:
-        # Send "Receiver" message
-        message = "Receiver"
-        client_socket.sendall(message.encode())
-
         # Receive response
         data = client_socket.recv(64)
         retChecksum = getChecksum(data.decode())

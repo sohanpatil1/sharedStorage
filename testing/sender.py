@@ -2,6 +2,7 @@
 import socket
 import hashlib
 import os
+import time
 
 
 def getChecksum(data):
@@ -26,13 +27,12 @@ def main():
     try:
         # Send data
         message = "Hello, world"
-        checksum = getChecksum(message)
-        print(f"client2 sending '{message}' to the server")
-        client_socket.sendall(message.encode())
-        
-    finally:
-        # Clean up
-        client_socket.close()
+        print(f"sender2 sending '{message}' to the server")
+        client_socket.send(message.encode())
+    except:
+        print("error")
+    while True:
+        pass
 
 if __name__ == "__main__":
     main()
