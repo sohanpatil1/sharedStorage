@@ -1,18 +1,19 @@
 from cryptography.fernet import Fernet
-import requests
-import uvicorn
-from fastapi import FastAPI, Request, Response
 import hashlib
+import os
 
-app = FastAPI()
-
-def getChecksum(filename):
+def getChecksum(data):
     md5_hash = hashlib.md5()
-    with open(filename,"rb") as f:
-        # Read and update hash in chunks of 4K
-        for byte_block in iter(lambda: f.read(4096),b""):
-            md5_hash.update(byte_block)
-    return md5_hash.hexdigest()
+    if isinstance(data, str) and os.path.isfile(data):
+        with open(data, "rb") as f:
+            # Read and update hash in chunks of 4K
+            for byte_block in iter(lambda: f.read(4096), b""):
+                md5_hash.update(byte_block)
+    else:
+        # If the input is not a filename or the file does not exist, assume it's a string
+        md5_hash.update(data.encode('utf-8'))
+    
+    return md5_hash, md5_hash.hexdigest()
 
 def encrypt_filename(filename, key):
     cipher_suite = Fernet(key)
@@ -26,7 +27,6 @@ def decrypt_filename(encrypted_filename, key):
 
 def encrypt_file(file_with_extension, key, chunk=64*1024):
     encrypted_filename = encrypt_filename(file_with_extension)
-    parts = file_with_extension.split(".")
     cipher_suite = Fernet(key)
 
     with open(file_with_extension, 'rb') as file:
@@ -59,20 +59,9 @@ def decrypt_file(encrypted_filename, key, chunk=64*1024):
 def generateKey():
     return Fernet.generate_key()    
 
-@app.post("/upload")
-def uploadToMachine(request: Request):
-    return
-
-@app.get("/download")
-def downloadFromMachine(request: Request):
-    return
-
 key = generateKey()
-encrypted_data = encrypt_file("Professional_Photo.jpg", key)
-decrypted_data = decrypt_file(encrypted_data=encrypted_data, key=key)
+encrypted_filename = encrypt_file("Professional_Photo.jpg", key)
+decrypted_filename = decrypt_file(encrypted_filename=encrypted_filename, key=key)
 
 with open("NewProfessional_Photo.jpg", 'wb') as file:
-    file.write(decrypted_data)
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8040)
+    file.write(decrypted_filename)
