@@ -1,2 +1,5 @@
 __pycache__
 venvStorage/
+.vscode
+storage.code-workspace
+.DS_Store

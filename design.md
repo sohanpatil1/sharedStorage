@@ -34,5 +34,6 @@ graph TD;
     - Server ends job when destination shares data size.    (Potential for hacking)
 
 
-
-Incorrect destination or incorrect packet received should be notified to the server from the client.
+To do
+- Incorrect destination or incorrect packet received should be notified to the server from the client.
+- When acknowledge from client is not sent to server before shutting down machine, all acks should be saved in buffer of machine. When machine reconnects, it should send all acks.

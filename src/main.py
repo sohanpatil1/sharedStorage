@@ -1,16 +1,14 @@
-from fastapi import FastAPI, Request, Response
 import psycopg2
 from psycopg2.extras import Json, DictCursor
-import uvicorn
-# from cryptography.fernet import Fernet
+import config
 
 ###############################
 connection = psycopg2.connect(
-    dbname="storagedb",
-    user="postgres",
-    password="my_password",
-    host="localhost",
-    port="54320"
+    dbname=config.DB_NAME,
+    user=config.DB_USER,
+    password=config.DB_PASSWORD,
+    host=config.DB_HOST,
+    port=str(config.DB_PORT)
 )
 connection.autocommit = True
 cursor = connection.cursor(cursor_factory=DictCursor)
@@ -36,13 +34,7 @@ destinations = {
 """
 ###############################
 
-app = FastAPI()
-
-# def generateKey():
-#     return Fernet.generate_key()    
-
-@app.post("/upload")
-async def uploadToDest(request: Request):
+async def uploadToDest(request):
     client_ip = request.client.host
     sourceUID = request.query_params['sourceUID']
     spaceRequired = request.query_params['spaceRequired']
@@ -60,7 +52,3 @@ async def uploadToDest(request: Request):
     
     if len(results) == 0:   # First upload
         query = f"INSERT sourceKey FROM tracker WHERE sourceUID = {sourceUID};"
-    
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
