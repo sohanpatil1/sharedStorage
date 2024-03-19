@@ -5,6 +5,8 @@ import logging
 import paho.mqtt.client as mqtt
 import psycopg2
 from psycopg2.extras import Json, DictCursor
+import requests
+from requests.auth import HTTPBasicAuth
 import time
 import uvicorn
 import uuid
@@ -56,16 +58,21 @@ client.on_publish = on_publish
 client.connect("localhost", 1883)
 client.loop_start()
 
+headers = {'Accept': 'application/json'}
+auth = HTTPBasicAuth(config.api_key, config.secret_Key)
+
+
 ###############################
 
 app = FastAPI()
 
 @app.post("/upload")
-async def uploadToDest(request):
-    sourceUID = request.query_params["sourceUID"]
-    pathToDirectory = request.query_params["path"]
-    key = request.query_params["encryptionKey"]
-    destination= request.query_params.get('destination', None),
+async def uploadToDest(request: Request):
+    request = await request.json()
+    sourceUID = request["sourceUID"]
+    pathToDirectory = request["filename"]
+    key = request.get("encryptionKey", None)
+    destination = request.get('destination', None)
 
     if not destination:
         # Check for any empty destination the source already has their information in.
@@ -75,11 +82,28 @@ async def uploadToDest(request):
     else:
         # Reach out to same destination
         generated_uuid = uuid.uuid4()
+        logging.info(f"Server generated topic : {generated_uuid}")
         topic = str(generated_uuid)
-        client.publish(topic="sourceUID", content=topic)    # Share topic with source
-        client.publish(topic="destination", content=topic)    # Share topic with destination
-        pass
-    return topic
+        logging.info(topic)
+        payload = {
+            "topic": topic
+        }
+        logging.info(f"Server publishing topic at topic: {destination}")
+        client.publish(topic=destination, payload=json.dumps(payload))    # Share topic with destination
+        response = requests.get("http://localhost:18083/api/v5/clients/temp/subscriptions", headers=headers, auth=auth)
+        if response.ok:
+            time.sleep(2)
+            logging.info("Waited for 2 seconds")
+            if destination in response.text:
+                return topic
+            else:
+                logging.error("Receiver not ready. Try again")
+        else:
+            if requests.exceptions.HTTPError:
+                logging.error("No client ID found in the object.")
+            else:
+                logging.error("Could not check broker if subscriber is subscribing to new topic.")
+
 
 
 @app.get("/register")

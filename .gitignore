@@ -3,3 +3,4 @@ venvStorage/
 .vscode
 storage.code-workspace
 .DS_Store
+testing/
