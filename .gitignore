@@ -4,3 +4,6 @@ venvStorage/
 storage.code-workspace
 .DS_Store
 testing/
+cookie.json
+tempcookie.json
+sharedStorage/Professional_Photo.png
