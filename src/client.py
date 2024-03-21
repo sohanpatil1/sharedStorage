@@ -9,26 +9,23 @@ import logic
 import os
 import requests
 import sys
-import time
-import uuid
+import webbrowser
 
 from fastapi import FastAPI, Request, Response
-import msgpack
+from fastapi.middleware.cors import CORSMiddleware
 import paho.mqtt.client as mqtt
 import uvicorn
 
-
-def get_mac_address():
-    # Get the MAC address of the first network interface
-    mac = uuid.UUID(int=uuid.getnode()).hex[-12:]
-    mac_address = ":".join([mac[e : e + 2] for e in range(0, 12, 2)])
-    return mac_address
+MQTT_HOST = "localhost"
+FASTAPI_HOST = "localhost"
+CLIENT_ID = "client.py"
 
 
 def on_message(client, userdata, message):
     logging.info(f"Received message {sys.getsizeof(str(message.payload.decode()))}")    
     output = json.loads(message.payload.decode())
-    if "topic" in output.keys():
+    # if "topic" in output.keys():
+    if output['destination'] == message.topic:
         client.subscribe(output["topic"])
         logging.info(f"Client.py subscribed to {output['topic']}")
         return
@@ -70,40 +67,57 @@ def on_subscribe(client, userdata, mid, rc, properties):
 
 def Initialize(on_message, on_connect, on_publish):
     app = FastAPI()
-    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id="client.py")
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id=CLIENT_ID)
     client.on_message = on_message
     client.on_connect = on_connect
     client.on_publish = on_publish
-    client.connect("localhost", 1883)
+    client.connect(MQTT_HOST, 1883)
     client.loop_start()
     return app, client
 
 
 app, client = Initialize(on_message, on_connect, on_publish)
 
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.post("/publish")
-def publish(request: Request):
+async def publish(request: Request):
+    body = await request.json()
     logging.info("Client Publishing")
-    if eval(request.query_params['isEncrypted']):
+
+    if body['isEncrypted']:
         key = logic.generateKey()
     else: 
         key = None
+
     if not os.path.exists("cookie.json"):
         raise FileNotFoundError(f"You need to register first!")
     else:
         logging.info("Publishing since registered")
+
     with open("cookie.json", "r") as file:
         data = json.load(file)
-    body = {
+
+    params = {
         'sourceUID' : data['cookie'],
-        'filename': request.query_params.get("filename", None),
-        'destination': request.query_params.get('destination', None),
+        'filename': body.get("filename", None),
+        'destination': body.get('destination', None),
     }
+
     if key:
-        body['encryptionKey'] = key.decode()
-    if eval(request.query_params.get("isEncrypted", True)):
-        response = requests.post("http://localhost:8080/upload", json=body)
+        params['encryptionKey'] = key.decode()
+
+    if body.get("isEncrypted", True):
+        response = requests.post(f"http://{FASTAPI_HOST}:8080/upload", json=params)
         if response.ok:
             logging.info("Received topic for sending encrypted file")
             topic = response.text
@@ -120,14 +134,14 @@ def publish(request: Request):
         else:
             return Response(content=response.text, status_code=500)
     else:   # No need to be encrypted
-        response = requests.post("http://localhost:8080/upload", json=body)
+        response = requests.post(f"http://{FASTAPI_HOST}:8080/upload", json=params)
         if response.ok:
             logging.info("Received topic for sending encrypted file")
             with open(body['filename'], "rb") as file:
-                file_content = base64.b64encode(file.read())
-            topic = eval(response.text)
+                file_content = base64.b64encode(file.read())    # file content of the file being shared.
+            topic = eval(response.text) # Topic for sending content
             content = {
-                'filename': request.query_params.get("filename"),
+                'filename': body.get("filename"),
                 'isEncrypted' : False,
                 'data': file_content.decode(),
                 # 'data': base64.b64decode(file_content),
@@ -143,22 +157,24 @@ def publish(request: Request):
 
 
 @app.get("/download")
-def downloadBackup(request: Request):
+async def downloadBackup(request: Request):
     """
     Requesting client's data currently stored on friend's machine.
     """
     # Request for transfer credentials
-    body = {
-        'path': request.query_params["path"],   # Could be none. When only one folder has been pushed.
+    body = await request.json()
+    params = {
+        'path': body["path"],   # Could be none. When only one folder has been pushed.
     }
-    response = requests.get("http://localhost:8080/download", json=body)
+    response = requests.get(f"http://{FASTAPI_HOST}:8080/download", json=params)
     if response.ok:
         topic = response.text
+        logging.info("Made request to server for topic.")
         # Send information through mqtt
         client.subscribe(topic=topic)
         return Response(status_code=200)
     else:
-        return Response(content="Could not make request to server.", status_code=500)
+        return Response(content="Could not make request to server for topic.", status_code=500)
 
 
 @app.post("/register")
@@ -171,7 +187,6 @@ def register():
             os.remove("cookie.json")
         client.subscribe(data['cookie'])
     else:
-
         cookie = None
         key = logic.generateKey()
         logging.info("New registration")
@@ -181,9 +196,9 @@ def register():
             "spaceOffered" : 5368709120, #5 GB
             "location" : "sharedStorage/"
         }
-        response = requests.get("http://localhost:8080/register", json=body)
+        response = requests.get(f"http://{FASTAPI_HOST}:8080/register", json=body)
         if response.ok:
-            cookie = response.text
+            cookie = eval(response.text)
             logging.info("Received cookie:", cookie)
             data = {
                 'cookie': cookie,
@@ -195,8 +210,8 @@ def register():
         else:
             logging.info("Registration request failed with status code:", response.status_code)
             sys.exit(0)
-# publish()
-# register()
+        return Response(status_code=200)
 
 if __name__ == "__main__":
+    # webbrowser.open('file:///Users/sohanpatil/Documents/VSWorkspace/storage/src/frontend/index.html',new=2)
     uvicorn.run(app=app, host="0.0.0.0", port=8050)

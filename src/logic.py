@@ -1,6 +1,13 @@
 from cryptography.fernet import Fernet
 import hashlib
 import os
+import uuid
+
+def get_mac_address():
+    # Get the MAC address of the first network interface
+    mac = uuid.UUID(int=uuid.getnode()).hex[-12:]
+    mac_address = ":".join([mac[e : e + 2] for e in range(0, 12, 2)])
+    return mac_address
 
 def getChecksum(data):
     md5_hash = hashlib.md5()
