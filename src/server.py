@@ -80,17 +80,25 @@ async def uploadToDest(request: Request):
         cursor.execute(query, (sourceUID,))
         results = cursor.fetchone()
     else:
+        # Need to store content in PostgreSQL
         # Reach out to same destination
         generated_uuid = uuid.uuid4()
         logging.info(f"Server generated topic : {generated_uuid}")
         topic = str(generated_uuid)
         logging.info(topic)
         payload = {
-            "topic": topic
+            'filename': None,
+            'isEncrypted' : None,
+            'data': None,
+            'key' : None,
+            'source' : None,  # Which machine sends the file
+            'destination': destination, # Which machine receives it
+            'topic' : topic,
         }
         logging.info(f"Server publishing topic at topic: {destination}")
         client.publish(topic=destination, payload=json.dumps(payload))    # Share topic with destination
-        response = requests.get("http://localhost:18083/api/v5/clients/temp/subscriptions", headers=headers, auth=auth)
+        return topic
+        response = requests.get("http://localhost:18083/api/v5/clients/suhasclient.py/subscriptions", headers=headers, auth=auth)
         if response.ok:
             time.sleep(2)
             logging.info("Waited for 2 seconds")
@@ -99,7 +107,9 @@ async def uploadToDest(request: Request):
             else:
                 logging.error("Receiver not ready. Try again")
         else:
-            if requests.exceptions.HTTPError:
+            data = response.json()
+            code = data['code']
+            if code == 'CLIENTID_NOT_FOUND':
                 logging.error("No client ID found in the object.")
             else:
                 logging.error("Could not check broker if subscriber is subscribing to new topic.")
@@ -120,9 +130,27 @@ async def login(request: Request):
 
 
 @app.get("/download")
-def requestDownload(request: Request):
-    """ """
+async def requestDownload(request: Request):
+    body = await request.json() # Why do I need await
+    requester = body['destination'] # Write to PostgreSQL
 
+    if body["sourceUID"]: # Requester knows where to get information from
+        sender = body["sourceUID"]
+        # Check if sender knows receiver
+        # Check if file is encrypted on friend's machine
+        generated_uuid = uuid.uuid4()
+        topic = str(generated_uuid)
+        payload = {
+            'filename': body['path'],
+            'isEncrypted' : False,
+            'data': None,
+            'key' : None,
+            'source' : sender,  # Which machine sends the file
+            'destination': None, # Which machine receives it
+            'topic' : topic,    # Topic used by source to publish message to requester
+        }
+        client.publish(topic=sender, payload=json.dumps(payload))    # Share topic with destination)    
+    return Response(content=topic, status_code=200)
 
 if __name__ == "__main__":
     try:

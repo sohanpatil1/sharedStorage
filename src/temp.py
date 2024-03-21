@@ -24,11 +24,6 @@ CLIENT_ID = "temp"
 def on_message(client, userdata, message):
     logging.info(f"Received message {sys.getsizeof(str(message.payload.decode()))}")    
     output = json.loads(message.payload.decode())
-    # if "topic" in output.keys():
-    if output['destination'] == message.topic:
-        client.subscribe(output["topic"])
-        logging.info(f"Client.py subscribed to {output['topic']}")
-        return
     """
     output = {
         'filename': encrypted_filename,
@@ -39,16 +34,40 @@ def on_message(client, userdata, message):
         'destination': destination, # Which machine received it
     }
     """
-    if output['isEncrypted']:
-        logging.error("Temp.py File is encrypted.")
-        decrypted_data = logic.decrypt_content(output["data"], output["key"])
-        filename = logic.decrypt_filename(output["filename"], key=output["key"])
-    else:
-        decrypted_data = base64.b64decode(output['data'])
-        filename = output['filename']
-        logging.info("Client.py writing to sharedStorage/test.png file")
-    logic.write_to_file(data=decrypted_data, filename=f"sharedStorage/{filename}")
-
+    if output['data']:  # Data being sent
+        if output['isEncrypted']:
+            logging.error("Temp.py File is encrypted.")
+            decrypted_data = logic.decrypt_content(output["data"], output["key"])
+            filename = logic.decrypt_filename(output["filename"], key=output["key"])
+        else:
+            decrypted_data = base64.b64decode(output['data'])
+            filename = output['filename']
+            logging.info(f"Client.py writing to sharedStorage/{filename} file")
+            client.unsubscribe(message.topic)
+        logic.write_to_file(data=decrypted_data, filename=f"sharedStorage/test.png")
+    
+    else:   # Topic being shared
+        with open("tempcookie.json", "r") as file:
+            data = json.load(file)
+        if output['source'] == data['cookie']:  # Publisher received topic to upload
+            with open(output['filename'], "rb") as file:
+                file_content = base64.b64encode(file.read())    # file content of the file being shared.
+            topic = output['topic'] # Topic for sending content
+            content = {
+                'filename': output["filename"],
+                'isEncrypted' : False,
+                'data': file_content.decode(),
+                # 'data': base64.b64decode(file_content),
+                'key' : None,
+                'source' : None,  # Which machine sent it
+                'destination': "b89422da-ef65-4589-80bd-4f846b17e763", # Which machine received it
+            }
+            logging.info(f"Client.py returned the file without encryption at topic {topic}.")
+            client.publish(topic=topic, payload=json.dumps(content))
+        else:
+            client.subscribe(output["topic"])
+            logging.info(f"Client.py subscribed to {output['topic']}")
+        return
 
 def on_connect(client, userdata, flags, rc, properties):
     logging.info("Client.py connected to broker!")

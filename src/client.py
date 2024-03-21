@@ -24,11 +24,6 @@ CLIENT_ID = "client.py"
 def on_message(client, userdata, message):
     logging.info(f"Received message {sys.getsizeof(str(message.payload.decode()))}")    
     output = json.loads(message.payload.decode())
-    # if "topic" in output.keys():
-    if output['destination'] == message.topic:
-        client.subscribe(output["topic"])
-        logging.info(f"Client.py subscribed to {output['topic']}")
-        return
     """
     output = {
         'filename': encrypted_filename,
@@ -39,15 +34,22 @@ def on_message(client, userdata, message):
         'destination': destination, # Which machine received it
     }
     """
-    if output['isEncrypted']:
-        logging.error("Temp.py File is encrypted.")
-        decrypted_data = logic.decrypt_content(output["data"], output["key"])
-        filename = logic.decrypt_filename(output["filename"], key=output["key"])
-    else:
-        decrypted_data = base64.b64decode(output['data'])
-        filename = output['filename']
-        logging.info("Client.py writing to sharedStorage/test.png file")
-    logic.write_to_file(data=decrypted_data, filename=f"sharedStorage/{filename}")
+    if output['data']:  # Data being sent
+        if output['isEncrypted']:
+            logging.error("Temp.py File is encrypted.")
+            decrypted_data = logic.decrypt_content(output["data"], output["key"])
+            filename = logic.decrypt_filename(output["filename"], key=output["key"])
+        else:
+            decrypted_data = base64.b64decode(output['data'])
+            filename = output['filename']
+            logging.info(f"Client.py writing to sharedStorage/{filename} file")
+            client.unsubscribe(message.topic)
+        logic.write_to_file(data=decrypted_data, filename=f"sharedStorage/test.png")
+    
+    else:   # Topic received by B, when A wants to publish to B
+        client.subscribe(output["topic"])
+        logging.info(f"Client.py subscribed to {output['topic']}")
+        return
 
 
 def on_connect(client, userdata, flags, rc, properties):
@@ -163,13 +165,17 @@ async def downloadBackup(request: Request):
     """
     # Request for transfer credentials
     body = await request.json()
+    with open("cookie.json", "r") as file:
+        cookie = json.load(file)
     params = {
+        'sourceUID': body['sourceUID'], # Identifier of the person storing my information
+        'destination' : cookie,    # Identifier for me
         'path': body["path"],   # Could be none. When only one folder has been pushed.
     }
     response = requests.get(f"http://{FASTAPI_HOST}:8080/download", json=params)
     if response.ok:
         topic = response.text
-        logging.info("Made request to server for topic.")
+        logging.info(f"Subscribing to {topic} to download information from other user.")
         # Send information through mqtt
         client.subscribe(topic=topic)
         return Response(status_code=200)
