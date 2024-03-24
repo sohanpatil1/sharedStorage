@@ -1,17 +1,19 @@
-import socket, threading
+from fastapi import FastAPI
 
-# https://stackoverflow.com/questions/10810249/python-socket-multiple-clients
-serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serversocket.bind(('', 5555))
-serversocket.listen(5)
-connection, address = serversocket.accept()
+# Create an instance of the FastAPI class
+app = FastAPI()
 
-print(f"New connection {connection=} {address=}")
-while True:
-    buf = connection.recv(64)
-    if not buf:
-        print(f"Closing connection {connection=} {address=}")
-        break
-    print(buf)
-    
-    # server_socket_1.setsockopt(socket.SO_REUSEADDR, 1)
+# Define a route for the root endpoint "/"
+@app.get("/")
+async def read_root():
+    return {"message": "Hello, world!"}
+
+# Define a route for "/items/{item_id}" where item_id is a path parameter
+@app.get("/items/{item_id}")
+async def read_item(item_id: int):
+    return {"item_id": item_id}
+
+# Run the FastAPI application using uvicorn server on port 8080
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8081)

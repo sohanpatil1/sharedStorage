@@ -229,6 +229,8 @@ def register():
             logging.info("Registration request failed with status code:", response.status_code)
             sys.exit(0)
         return Response(status_code=200)
+    
+register()
 
 if __name__ == "__main__":
     # webbrowser.open('file:///Users/sohanpatil/Documents/VSWorkspace/storage/src/frontend/index.html',new=2)

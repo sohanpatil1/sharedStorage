@@ -9,7 +9,6 @@ import logic
 import os
 import requests
 import sys
-import webbrowser
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +17,7 @@ import uvicorn
 
 MQTT_HOST = "localhost"
 FASTAPI_HOST = "localhost"
+# FASTAPI_HOST = "35.87.33.114"
 CLIENT_ID = "client.py"
 
 
@@ -46,9 +46,27 @@ def on_message(client, userdata, message):
             client.unsubscribe(message.topic)
         logic.write_to_file(data=decrypted_data, filename=f"sharedStorage/test.png")
     
-    else:   # Topic received by B, when A wants to publish to B
-        client.subscribe(output["topic"])
-        logging.info(f"Client.py subscribed to {output['topic']}")
+    else:   # Topic being shared
+        with open("tempcookie.json", "r") as file:
+            data = json.load(file)
+        if output['source'] == data['cookie']:  # Publisher received topic to upload
+            with open(output['filename'], "rb") as file:
+                file_content = base64.b64encode(file.read())    # file content of the file being shared.
+            topic = output['topic'] # Topic for sending content
+            content = {
+                'filename': output["filename"],
+                'isEncrypted' : False,
+                'data': file_content.decode(),
+                # 'data': base64.b64decode(file_content),
+                'key' : None,
+                'source' : None,  # Which machine sent it
+                'destination': "b89422da-ef65-4589-80bd-4f846b17e763", # Which machine received it
+            }
+            logging.info(f"Client.py returned the file without encryption at topic {topic}.")
+            client.publish(topic=topic, payload=json.dumps(content))
+        else:   # Receiver received topic to subscribe
+            client.subscribe(output["topic"])
+            logging.info(f"Client.py subscribed to {output['topic']}")
         return
 
 
@@ -80,15 +98,15 @@ def Initialize(on_message, on_connect, on_publish):
 
 app, client = Initialize(on_message, on_connect, on_publish)
 
-origins = ["*"]
+# origins = ["*"]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 
 @app.post("/publish")
@@ -136,7 +154,7 @@ async def publish(request: Request):
         else:
             return Response(content=response.text, status_code=500)
     else:   # No need to be encrypted
-        response = requests.post(f"http://{FASTAPI_HOST}:8080/upload", json=params)
+        response = requests.post(f"http://localhost:8080/upload", json=params)
         if response.ok:
             logging.info("Received topic for sending encrypted file")
             with open(body['filename'], "rb") as file:
@@ -218,6 +236,6 @@ def register():
             sys.exit(0)
         return Response(status_code=200)
 
+register()
 if __name__ == "__main__":
-    # webbrowser.open('file:///Users/sohanpatil/Documents/VSWorkspace/storage/src/frontend/index.html',new=2)
     uvicorn.run(app=app, host="0.0.0.0", port=8050)
