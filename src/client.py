@@ -11,13 +11,13 @@ import requests
 import sys
 
 from fastapi import FastAPI, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware
 import paho.mqtt.client as mqtt
 import uvicorn
 
 MQTT_HOST = "localhost"
-FASTAPI_HOST = "localhost"
-# FASTAPI_HOST = "35.87.33.114"
+# FASTAPI_HOST = "localhost"
+FASTAPI_HOST = "35.87.33.114"
 CLIENT_ID = "client.py"
 
 
@@ -137,7 +137,7 @@ async def publish(request: Request):
         params['encryptionKey'] = key.decode()
 
     if body.get("isEncrypted", True):
-        response = requests.post(f"http://{FASTAPI_HOST}:8080/upload", json=params)
+        response = requests.post(f"http://{FASTAPI_HOST}:8081/upload", json=params)
         if response.ok:
             logging.info("Received topic for sending encrypted file")
             topic = response.text
@@ -154,7 +154,7 @@ async def publish(request: Request):
         else:
             return Response(content=response.text, status_code=500)
     else:   # No need to be encrypted
-        response = requests.post(f"http://localhost:8080/upload", json=params)
+        response = requests.post(f"http://localhost:8081/upload", json=params)
         if response.ok:
             logging.info("Received topic for sending encrypted file")
             with open(body['filename'], "rb") as file:
@@ -190,7 +190,7 @@ async def downloadBackup(request: Request):
         'destination' : cookie,    # Identifier for me
         'path': body["path"],   # Could be none. When only one folder has been pushed.
     }
-    response = requests.get(f"http://{FASTAPI_HOST}:8080/download", json=params)
+    response = requests.get(f"http://{FASTAPI_HOST}:8081/download", json=params)
     if response.ok:
         topic = response.text
         logging.info(f"Subscribing to {topic} to download information from other user.")
@@ -220,7 +220,7 @@ def register():
             "spaceOffered" : 5368709120, #5 GB
             "location" : "sharedStorage/"
         }
-        response = requests.get(f"http://{FASTAPI_HOST}:8080/register", json=body)
+        response = requests.get(f"http://{FASTAPI_HOST}:8081/register", json=body)
         if response.ok:
             cookie = eval(response.text)
             logging.info("Received cookie:", cookie)
@@ -238,4 +238,4 @@ def register():
 
 register()
 if __name__ == "__main__":
-    uvicorn.run(app=app, host="0.0.0.0", port=8050)
+    uvicorn.run(app=app, host="0.0.0.0", port=8050, access_log=False, server_header=False)
